@@ -1,0 +1,105 @@
+---
+title: "Practical Machine Learning"
+author: "Avanindra Nath Thakur"
+date: "11/03/2021"
+output: html_document
+
+
+```{r, include=TRUE, echo=TRUE}
+
+#Introduction
+# Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+#Data
+
+#The training data for this project are available here:
+
+#https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+#The test data are available here:
+
+#https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+#The data for this project come from this source: http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har. If you use the document you create for this class for any purpose please cite them as they have been very generous in allowing their data to be used for this kind of assignment.
+#Executive Summary
+#This project predicts the  “classe” variable in the training data set. different methods are used in this report to explain the model and its cross validation by using alternative methods as explained in the class. 
+
+
+library(caret);library(rpart)
+library(rpart.plot)
+library(randomForest)
+
+# downloading data 
+urlTrain <- "http://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+urlTest  <- "http://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+
+trainData <- read.csv(url(urlTrain))
+testData  <- read.csv(url(urlTest))
+
+# creating a partition within the training data 
+inTrain  <- createDataPartition(trainData$classe, p=0.7, list=FALSE)
+TrainSet <- trainData[inTrain, ]
+TestSet  <- trainData[-inTrain, ]
+dim(TrainSet)
+dim(TestSet)
+
+#cleaning data with the removal of almost zero variance
+NearlyZeroVar<- nearZeroVar(TrainSet)
+TrainSet <- TrainSet[, -NearlyZeroVar]
+TestSet  <- TestSet[, -NearlyZeroVar]
+dim(TrainSet)
+dim(TestSet)
+#second round of cleaning by removing data with missing values 
+TotalNA    <- sapply(TrainSet, function(x) mean(is.na(x))) > 0.95
+TrainSet <- TrainSet[, TotalNA==FALSE]
+TestSet  <- TestSet[, TotalNA==FALSE]
+dim(TrainSet)
+dim(TestSet)
+
+#Removing the first 7 non-numeric Variables   
+TrainSet<- TrainSet[, 8:59]
+TestSet<- TestSet[, 8:59]
+dim(TrainSet)
+dim(TestSet)
+
+##Step 2: Random Forest
+set.seed(123)
+contRF <- trainControl(method="cv", number=3, verboseIter=FALSE)
+modFitRF <- train(classe ~ ., data=TrainSet, method="rf",
+                          trControl=contRF)
+modFitRF$finalModel
+
+# performing prediction on Test dataset
+predictRF <- predict(modFitRF, newdata=TestSet)
+confusMatRF<- confusionMatrix(predictRF, as.factor(TestSet$classe))
+#ploting the result
+# plot matrix results
+plot(confusMatRF$table, col = confusMatRF$byClass, 
+     main = paste("Random Forest - Accuracy =",
+                  round(confusMatRF$overall['Accuracy'], 4)))
+
+#step 3 Generalised Boosted Model and prediction 
+set.seed(123)
+library(gbm)
+contGBM <- trainControl(method = "repeatedcv", number = 5, repeats = 1)
+modFitGBM  <- train(classe ~ ., data=TrainSet, method = "gbm",
+                    trControl = contGBM, verbose = FALSE)
+modFitGBM$finalModel
+#predicting with GBM
+predictGBM <- predict(modFitGBM, newdata=TestSet)
+confusMatGBM <- confusionMatrix(predictGBM, as.factor(TestSet$classe))
+confusMatGBM
+
+# plotting the results
+plot(confusMatGBM$table, col = confusMatGBM$byClass, 
+     main = paste("GBM - Accuracy =", round(confusMatGBM$overall['Accuracy'], 4)))
+
+#final Step Applying the model on test data 
+predictTEST <- predict(modFitRF, newdata=testData)
+predictTEST
+
+```
+
+
+
+
